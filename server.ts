@@ -1,46 +1,45 @@
-//Write simple node.js express server using type script
-//Run the server using ts-node server.ts
-//Open browser and hit http://localhost:3000/?name=yourname
-
-import express from "express";
-import { Request, Response } from "express";
-import { createServer } from "http";
-import expressSanitizer from "express-sanitizer";
-// Notice: The primary dependency for this library hasn't been updated in 5 years. Security vulnerabilities may exist in this library.
+import express, { Request, Response, NextFunction } from 'express';
+import { createServer } from 'http';
+import expressSanitizer from 'express-sanitizer';
 
 const ERROR_MESSAGES = {
-  INVALID_INPUT: "Invalid input"
+  INVALID_INPUT: 'Invalid input'
 };
 
 const app = express();
 const httpServer = createServer(app);
+
 app.use(expressSanitizer());
 
-app.get("/", (req: Request, res: Response) => {
+// Custom middleware for sanitizing the "name" field
+const sanitizeMiddleware = (req: Request, res: Response, next: NextFunction) => {
+  const fieldName = 'name';
 
-  const fieldName = "name"
-  const name = req.query[fieldName] as string;
-  const trimmedName = name.trim();
-  const cleanName = (req as any).sanitize(trimmedName).trim(); // type definition for sanitize is missing
+  if (req.query[fieldName]) {
+    const name = req.query[fieldName] as string;
+    const trimmedName = name.trim();
+    const cleanName = (req as any).sanitize(trimmedName).trim();
 
-  if (name !== cleanName) {
-    //  Input "sanitization" (invalid input, code injection attack):422 Unprocessable Entity
+    if (name !== cleanName) {
+      console.log(`User entered malicious code ${name} and it was sanitized to ${cleanName}`);
+      return res.status(422).send(`${ERROR_MESSAGES.INVALID_INPUT} ${fieldName} ${cleanName}`);
+    }
 
-    console.log(
-      `User entered malicious code ${name} and it was sanitized to ${cleanName}`
-    );
-    res.status(422).send(`${ERROR_MESSAGES.INVALID_INPUT} ${fieldName} ${cleanName}`);
-
-  } else { 
-    res.send(`Hi, you entered ${cleanName}`);
+    req.query[fieldName] = cleanName;
   }
 
+  next();
+};
 
+app.use(sanitizeMiddleware);
+
+app.get('/', (req: Request, res: Response) => {
+  const name = req.query.name as string;
+  res.send(`Hi, you entered ${name}`);
 });
 
 httpServer.listen(3000, () => {
-  console.log("listening on *:3000");
+  console.log('listening on *:3000');
 });
 
-//export the app as default export
 export default app;
