@@ -13,29 +13,39 @@ app.use(expressSanitizer());
 
 // Custom middleware for sanitizing the "name" field
 const sanitizeMiddleware = (req: Request, res: Response, next: NextFunction) => {
-  const fieldName = 'name';
+  const queryParams = req.query;
 
-  if (req.query[fieldName]) {
-    const name = req.query[fieldName] as string;
-    const trimmedName = name.trim();
-    const cleanName = (req as any).sanitize(trimmedName).trim();
+  for (const key in queryParams) {
+    if (queryParams.hasOwnProperty(key)) {
+      const value = queryParams[key] as string;
+      const trimmedValue = value.trim();
+      const cleanValue = (req as any).sanitize(trimmedValue).trim();
 
-    if (name !== cleanName) {
-      console.log(`User entered malicious code ${name} and it was sanitized to ${cleanName}`);
-      return res.status(422).send(`${ERROR_MESSAGES.INVALID_INPUT} ${fieldName} ${cleanName}`);
+      if (value !== cleanValue) {
+        console.log(`User entered malicious code ${value} for field ${key} and it was sanitized to ${cleanValue}`);
+        return res.status(422).send(`${ERROR_MESSAGES.INVALID_INPUT} ${key} ${cleanValue}`);
+      }
+
+      queryParams[key] = cleanValue;
     }
-
-    req.query[fieldName] = cleanName;
   }
 
   next();
 };
 
+
 app.use(sanitizeMiddleware);
 
 app.get('/', (req: Request, res: Response) => {
-  const name = req.query.name as string;
-  res.send(`Hi, you entered ${name}`);
+  const queryParams = req.query;
+  const queryKeys = Object.keys(queryParams);
+
+  if (queryKeys.length === 0) {
+    res.send('No query parameters found');
+  } else {
+    const queryValues = queryKeys.map((key) => `${key}: ${queryParams[key]}`);
+    res.send(`Query parameters sent: ${queryValues.join(', ')}`);
+  }
 });
 
 httpServer.listen(3000, () => {
